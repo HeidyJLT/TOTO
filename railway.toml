@@ -1,0 +1,25 @@
+# ============================================================
+#  railway.toml — Configuración de Railway
+#
+#  Railway usa este archivo para configurar el despliegue.
+#  Es opcional pero recomendado para control explícito.
+#
+#  ✏️ MODIFICA AQUÍ: ajusta según tu proyecto
+# ============================================================
+
+[build]
+# Comando para instalar dependencias
+builder = "NIXPACKS"
+
+[deploy]
+# ✏️ Comando de arranque — debe coincidir con el Procfile
+startCommand = "uvicorn main:app --host 0.0.0.0 --port $PORT"
+
+# ✏️ Endpoint que Railway usa para verificar que el servicio vive
+healthcheckPath = "/health"
+
+# Tiempo máximo de espera para el health check (segundos)
+healthcheckTimeout = 30
+
+# Número de reinicios antes de marcar como fallido
+restartPolicyMaxRetries = 3
