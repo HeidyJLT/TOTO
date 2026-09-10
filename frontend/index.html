@@ -363,6 +363,9 @@
     color: var(--text);
   }
   textarea#input:focus-visible { outline-offset: 0; border-color: var(--metal-2); }
+  textarea#input { caret-color: var(--metal-2); scrollbar-width: thin; scrollbar-color: var(--border-soft) transparent; }
+  textarea#input::-webkit-scrollbar { width: 6px; }
+  textarea#input::-webkit-scrollbar-thumb { background: var(--border-soft); border-radius: 3px; }
 
   .send-btn {
     width: 40px;
