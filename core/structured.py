@@ -11,16 +11,17 @@ from typing import List
 from pydantic import BaseModel, Field
 
 
-class Alerta(BaseModel):
-    """Una alerta o riesgo detectado para el reporte ejecutivo."""
-    area: str = Field(description="Área afectada: Ventas, RRHH, Operaciones, Finanzas, etc.")
-    descripcion: str = Field(description="Descripción concreta del riesgo o alerta")
-    accion_recomendada: str = Field(description="Acción concreta recomendada")
+class CriterioRubrica(BaseModel):
+    """Un criterio de la rúbrica de evaluación de la actividad."""
+    criterio: str = Field(description="Nombre del criterio evaluado, ej. 'Claridad conceptual'")
+    descripcion: str = Field(description="Qué se evalúa en este criterio")
+    nivel_logro: str = Field(description="Nivel de logro esperado, ej. 'Sobresaliente', 'Aceptable', 'Insuficiente'")
 
 
-class ReporteEjecutivo(BaseModel):
-    """Reporte ejecutivo estructurado para TechnoDistrib S.A.S."""
-    resumen_ejecutivo: str = Field(description="Resumen del reporte en 2-3 oraciones")
-    alertas: List[Alerta] = Field(default_factory=list, description="Alertas o riesgos detectados")
-    oportunidades: List[str] = Field(default_factory=list, description="Oportunidades identificadas")
-    recomendaciones: List[str] = Field(default_factory=list, description="Recomendaciones priorizadas")
+class InsumoAula(BaseModel):
+    """Insumo estructurado para la construcción de un aula virtual."""
+    competencia: str = Field(description="Competencia a desarrollar en el curso")
+    resultados_aprendizaje: List[str] = Field(default_factory=list, description="Resultados de aprendizaje asociados a la competencia")
+    nivel_bloom: str = Field(description="Nivel de la taxonomía de Bloom: Recordar, Comprender, Aplicar, Analizar, Evaluar o Crear")
+    actividad_evaluativa: str = Field(description="Actividad evaluativa propuesta para el resultado de aprendizaje")
+    criterios_rubrica: List[CriterioRubrica] = Field(default_factory=list, description="Criterios de la rúbrica de evaluación de la actividad")

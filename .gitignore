@@ -43,3 +43,5 @@ logs/
 
 # Railway
 .railway/
+# Documentos institucionales — no se versionan (~400 MB)
+data/documentos/

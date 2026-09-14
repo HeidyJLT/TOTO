@@ -26,6 +26,7 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
@@ -96,6 +97,8 @@ app.include_router(agent_router,  tags=["Agente"])
 #  para modificar la interfaz visual del chat.
 # ═══════════════════════════════════════════════════════════
 FRONTEND_INDEX = Path(__file__).parent / "frontend" / "index.html"
+STATIC_DIR = Path(__file__).parent / "frontend" / "static"
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
 @app.get("/", tags=["Info"])

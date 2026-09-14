@@ -32,8 +32,13 @@ class AgentService:
 
     def __init__(self):
         self._historiales: dict[str, ChatMessageHistory] = {}
-        self._modelo = os.getenv("GROQ_MODEL", os.getenv("OLLAMA_MODEL", "desconocido"))
         self._proveedor = os.getenv("LLM_PROVIDER", "groq")
+        self._modelo = (os.getenv("GROQ_MODEL", "desconocido")
+         if self._proveedor == "groq"
+         else os.getenv("OLLAMA_MODEL", "desconocido")
+        )
+        ##self._modelo = os.getenv("GROQ_MODEL", os.getenv("OLLAMA_MODEL", "desconocido"))
+        ##self._proveedor = os.getenv("LLM_PROVIDER", "groq")
         # ✏️ MODIFICA AQUÍ: tipo de memoria — "buffer" (recuerda todo)
         # o "window" (solo los últimos N mensajes, ver MEMORY_WINDOW_SIZE)
         self._memory_type = os.getenv("MEMORY_TYPE", "buffer")

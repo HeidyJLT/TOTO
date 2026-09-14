@@ -32,7 +32,7 @@ class ChatRequest(BaseModel):
     class Config:
         json_schema_extra = {
             "example": {
-                "mensaje":    "¿Qué temperatura hace en Bogotá?",
+                "mensaje":    "¿Que es método Prudencial?",
                 "session_id": "usuario_001"
             }
         }

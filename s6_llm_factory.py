@@ -22,5 +22,9 @@ def crear_llm(temperature=None, max_tokens=None, modelo=None):
     else:
         from langchain_ollama import ChatOllama
         return ChatOllama(model=modelo or os.getenv("OLLAMA_MODEL", "llama3.2"),
-                          base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
-                          temperature=temperature)
+                  base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
+                  temperature=temperature,
+                  num_predict=max_tokens)
+        ##return ChatOllama(model=modelo or os.getenv("OLLAMA_MODEL", "llama3.2"),
+          ##                base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
+            ##              temperature=temperature)

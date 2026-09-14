@@ -19,6 +19,7 @@ Búsqueda HÍBRIDA en dos capas (la misma técnica validada en el curso):
 import os
 import sys
 import unicodedata
+import json
 from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -31,6 +32,7 @@ DOCUMENTOS_DIR = Path(os.getenv("DOCUMENTOS_DIR", "data/documentos"))
 TAMANO_FRAGMENTO = int(os.getenv("TAMANO_FRAGMENTO", "900"))
 SUPERPOSICION_FRAGMENTO = int(os.getenv("SUPERPOSICION_FRAGMENTO", "120"))
 K_FRAGMENTOS = int(os.getenv("K_FRAGMENTOS", "4"))
+INDICE_PATH = Path("data/indice.json")
 
 STOPWORDS_ES = {
     "de", "la", "el", "los", "las", "en", "y", "a", "que", "es", "un",
@@ -81,6 +83,25 @@ class MotorRAG:
         self._construir()
 
     def _construir(self):
+        if INDICE_PATH.exists():
+            datos = json.loads(INDICE_PATH.read_text(encoding="utf-8"))
+
+            def _a_documentos(items):
+                docs = []
+                for item in items:
+                    meta = {
+                        "source": item["source"],
+                        "page": item["page"],
+                        "keywords": set(item.get("keywords", [])),
+                    }
+                    docs.append(Document(page_content=item["page_content"], metadata=meta))
+                return docs
+
+            self.fragmentos = _a_documentos(datos.get("fragmentos", []))
+            self.paginas = _a_documentos(datos.get("paginas", []))
+            print(f"  📚 RAG listo (índice precalculado): {len(self.paginas)} documento(s), {len(self.fragmentos)} fragmentos")
+            return
+
         if not DOCUMENTOS_DIR.exists():
             print(f"  ⚠️  Carpeta de documentos no encontrada: {DOCUMENTOS_DIR}")
             return
@@ -98,9 +119,13 @@ class MotorRAG:
         if not palabras_pregunta or not self.fragmentos:
             return "", []
 
+        def _keywords(doc):
+            kw = doc.metadata.get("keywords")
+            return kw if isinstance(kw, set) else palabras_clave(doc.page_content)
+
         puntuados = []
         for frag in self.fragmentos:
-            score = len(palabras_pregunta & palabras_clave(frag.page_content))
+            score = len(palabras_pregunta & _keywords(frag))
             if score > 0:
                 puntuados.append((score, frag))
         puntuados.sort(key=lambda x: x[0], reverse=True)
@@ -113,7 +138,7 @@ class MotorRAG:
         # Respaldo: texto exacto sobre la página completa (datos puntuales)
         umbral = max(2, len(palabras_pregunta) // 2)
         for pagina in self.paginas:
-            if len(palabras_pregunta & palabras_clave(pagina.page_content)) >= umbral:
+            if len(palabras_pregunta & _keywords(pagina)) >= umbral:
                 clave = (pagina.metadata.get("source"), pagina.metadata.get("page"))
                 elegidos.setdefault(clave, pagina)
 
