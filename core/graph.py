@@ -63,6 +63,28 @@ MENSAJE_SIN_INFO = (
     "Virtual de la seccional."
 )
 
+ESTILO_AGENTE = """Escribes en prosa, en párrafos cortos, como un asesor \
+pedagógico que le explica algo a un colega docente — nunca con tono de \
+informe generado.
+
+Usa tablas en Markdown (con pipes) solo cuando la información sea \
+realmente comparativa o matricial (criterios y niveles de una rúbrica, \
+pasos con responsable y entregable), nunca para exponer ideas que se \
+entienden mejor redactadas. Antes de cada tabla escribe un párrafo corto \
+que la introduzca; nunca entregues una tabla suelta como respuesta \
+completa. No pongas etiquetas HTML dentro de las celdas.
+
+No uses líneas divisorias (---, ***, ___), no uses encabezados con # ni \
+##, y no uses emojis. Si una respuesta necesita varias secciones, \
+sepáralas con un párrafo introductorio, no con títulos.
+
+Integra las citas a los documentos dentro de la frase, de forma natural \
+— por ejemplo "el Modelo Educativo Pedagógico lo plantea en la página \
+12" — y no como un corchete con el nombre del archivo al final del \
+párrafo.
+
+Le hablas al docente de tú, con cercanía pero sin informalidad excesiva."""
+
 
 def _modelo_clasificador() -> str | None:
     """Modelo liviano para el nodo coordinador, según el proveedor activo."""
@@ -169,6 +191,8 @@ def nodo_conversacion(estado: EstadoAgente) -> dict:
     system_prompt = f"""Eres {NOMBRE_AGENTE}, un {ROL_AGENTE}.
 {ALCANCE_AGENTE}
 
+{ESTILO_AGENTE}
+
 Responde siempre en español, claro y directo.
 Usa tus herramientas cuando las necesites en vez de inventar datos."""
     agente = create_agent(model=llm, tools=TOOLS_BASE, system_prompt=system_prompt)
@@ -189,6 +213,8 @@ def nodo_consulta(estado: EstadoAgente) -> dict:
     prompt = ChatPromptTemplate.from_messages([
         ("system", f"""Eres {NOMBRE_AGENTE}, {ROL_AGENTE}.
 {ALCANCE_AGENTE}
+
+{ESTILO_AGENTE}
 
 Responde ÚNICAMENTE basándote en el contexto de los documentos
 institucionales proporcionado. Si la información no está en el contexto,
@@ -218,6 +244,8 @@ def nodo_asesoria(estado: EstadoAgente) -> dict:
         system_prompt=f"""Eres un rastreador de lineamientos institucionales.
 {ALCANCE_AGENTE}
 
+{ESTILO_AGENTE}
+
 Usa tus herramientas para recopilar los lineamientos, criterios y
 procedimientos reales de la USTA relevantes a la pregunta ANTES de
 concluir nada. Sé concreto. Responde en español, en lista de puntos clave.""",
@@ -230,6 +258,8 @@ concluir nada. Sé concreto. Responde en español, en lista de puntos clave.""",
     asesoria = limpiar_pensamiento(crear_llm(temperature=0.4).invoke([
         SystemMessage(content=f"""Eres un asesor pedagógico de la Universidad
 Santo Tomás. {ALCANCE_AGENTE}
+
+{ESTILO_AGENTE}
 
 Interpreta los lineamientos recopilados y da recomendaciones concretas y
 accionables para el docente, alineadas al modelo educativo pedagógico de
@@ -244,6 +274,8 @@ Responde en español, estructurado."""),
     print("  ✍️  [REDACTOR] Redactando respuesta final...")
     redaccion = limpiar_pensamiento(crear_llm(temperature=0.5).invoke([
         SystemMessage(content=f"""Eres {NOMBRE_AGENTE}. {ALCANCE_AGENTE}
+
+{ESTILO_AGENTE}
 
 Toma la asesoría pedagógica recibida y conviértela en una respuesta final
 clara y bien organizada para el docente. Si la asesoría indica que no se
@@ -266,10 +298,11 @@ def nodo_insumo(estado: EstadoAgente) -> dict:
     # Con Ollama se respeta el modelo configurado en OLLAMA_MODEL.
     proveedor = os.getenv("LLM_PROVIDER", "ollama")
     modelo_estructurado = os.getenv("GROQ_MODEL_ESTRUCTURADO") if proveedor == "groq" else None
-    llm_estructurado = crear_llm(temperature=0.4, modelo=modelo_estructurado).with_structured_output(InsumoAula)
+    llm_base = crear_llm(temperature=0.4, modelo=modelo_estructurado)
 
     motor = obtener_motor()
     contexto, _fuentes = motor.buscar(estado["entrada_usuario"])
+    datos = contexto or "(no se encontraron lineamientos específicos en el contexto; apóyate únicamente en los criterios institucionales generales de la USTA que sí conozcas de la documentación cargada, sin fabricar normas, cifras ni procedimientos que no aparezcan en ella)"
 
     prompt = ChatPromptTemplate.from_messages([
         ("system", f"""{ALCANCE_AGENTE}
@@ -279,11 +312,42 @@ institucionales disponibles (rúbricas, taxonomía de Bloom, diseño
 curricular). Sé específico y accionable. Responde en español."""),
         ("human", "Solicitud: {solicitud}\n\nLineamientos institucionales disponibles:\n{datos}"),
     ])
-    chain = prompt | llm_estructurado
-    insumo: InsumoAula = chain.invoke({
-        "solicitud": estado["entrada_usuario"],
-        "datos": contexto or "(no se encontraron lineamientos específicos en el contexto; apóyate únicamente en los criterios institucionales generales de la USTA que sí conozcas de la documentación cargada, sin fabricar normas, cifras ni procedimientos que no aparezcan en ella)",
-    })
+
+    try:
+        chain = prompt | llm_base.with_structured_output(InsumoAula)
+        insumo: InsumoAula = chain.invoke({
+            "solicitud": estado["entrada_usuario"],
+            "datos": datos,
+        })
+    except Exception as e:
+        print(f"  ⚠️  [INSUMO] Falló la salida estructurada ({e!r}). Reintentando en JSON crudo...")
+        try:
+            prompt_json = ChatPromptTemplate.from_messages([
+                ("system", f"""{ALCANCE_AGENTE}
+
+Genera el insumo de aula para el docente, basándote en los lineamientos
+institucionales disponibles (rúbricas, taxonomía de Bloom, diseño
+curricular). Sé específico y accionable. Responde en español.
+
+Responde ÚNICAMENTE con un JSON válido que cumpla exactamente estos
+campos: competencia (string), resultados_aprendizaje (lista de strings),
+nivel_bloom (string), actividad_evaluativa (string), criterios_rubrica
+(lista de objetos con criterio, descripcion y nivel_logro, todos string).
+No agregues texto antes ni después, ni bloques de código con ```."""),
+                ("human", "Solicitud: {solicitud}\n\nLineamientos institucionales disponibles:\n{datos}"),
+            ])
+            bruto = (prompt_json | llm_base | StrOutputParser()).invoke({
+                "solicitud": estado["entrada_usuario"],
+                "datos": datos,
+            })
+            insumo = InsumoAula.model_validate_json(limpiar_pensamiento(bruto))
+        except Exception as e2:
+            print(f"  ⚠️  [INSUMO] También falló el reintento en JSON ({e2!r}).")
+            return {"respuesta_final": (
+                "No logré armar la ficha estructurada del insumo esta vez. "
+                "¿Puedes reformular tu solicitud indicando la asignatura y el "
+                "tema puntual? Con eso puedo intentarlo de nuevo."
+            )}
 
     salida = f"📋 INSUMO DE AULA\n\nCompetencia: {insumo.competencia}\n"
     if insumo.resultados_aprendizaje:
